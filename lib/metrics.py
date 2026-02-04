@@ -11,7 +11,8 @@ def wa(df: pd.DataFrame, value_col: str, weight_col: str) -> float:
 
 def portfolio_snapshot(positions: pd.DataFrame, risk: pd.DataFrame, asof: pd.Timestamp) -> dict:
     p = positions[positions["asof_date"] == asof].copy()
-    r = risk[risk["asof_date"d","asof_date"], how="left")
+    r = risk[risk["asof_date"] == asof].copy()
+    pr = p.merge(r, on=["loan_id","asof_date"], how="left")
 
     out = {}
     out["num_loans"] = int(pr["loan_id"].nunique())
@@ -34,8 +35,7 @@ def performance_bridge(cashflows: pd.DataFrame, nav: pd.DataFrame, start: pd.Tim
         "Cash Interest": cf.get("interest_cash", pd.Series(dtype=float)).sum(),
         "PIK Accrual": cf.get("interest_pik", pd.Series(dtype=float)).sum(),
         "Fees": cf.get("fees", pd.Series(dtype=float)).sum(),
-        "Principal": cf.get("pr] == asof].copy()
-    pr = p.merge(r, on=["loan_iincipal", pd.Series(dtype=float)).sum(),
+        "Principal": cf.get("principal", pd.Series(dtype=float)).sum(),
     }
     # fund-level fees/expenses if present
     navw = nav[(nav["date"] >= start) & (nav["date"] <= end)].copy()
