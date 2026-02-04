@@ -12,7 +12,7 @@ def load_table(name: str) -> pd.DataFrame:
     # normalize dates
     for c in ["asof_date", "date", "pay_date"]:
         if c in df.columns:
-            df[c] = pd.to_datetime(df[c])
+            df[c] = pd.to_datetime(df[c], errors="coerce").dt.normalize()
     return df
 
 def load_all():
