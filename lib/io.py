@@ -7,6 +7,8 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 @lru_cache(maxsize=32)
 def load_table(name: str) -> pd.DataFrame:
+    if not name:
+        return pd.DataFrame()
     fp = DATA_DIR / f"{name}.xlsx"
     df = pd.read_excel(fp, engine="openpyxl")
     # normalize dates
