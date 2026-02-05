@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from lib.metrics import performance_bridge
+from lib.state import get_data
 
-DATA = st.session_state["DATA"]
+DATA = get_data()
+#DATA = st.session_state["DATA"]
 cashflows = DATA["cashflows"]
 nav = DATA["nav"]
 

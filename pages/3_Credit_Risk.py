@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from lib.state import get_data
 
-DATA = st.session_state["DATA"]
+DATA = get_data()
+#DATA = st.session_state["DATA"]
 positions = DATA["positions"]
 risk = DATA["risk"]
 asof = DATA["asof"]

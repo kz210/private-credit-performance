@@ -1,7 +1,97 @@
 from __future__ import annotations
-
 import pandas as pd
 import numpy as np
+def facility_yield_snapshot(
+    facility: pd.DataFrame,
+    cashflows: pd.DataFrame,
+    asof: pd.Timestamp,
+    facility_margin_bps: float = 250.0,   # input (bank margin over base)
+    undrawn_fee_bps: float = 50.0,        # input
+    day_count: int = 360,
+) -> dict:
+    """
+    Returns both:
+      (1) Lender facility yield (needs margin + undrawn fee inputs)
+      (2) Borrower net carry (uses asset interest from cashflows minus funding cost)
+
+    Assumptions:
+      - cashflows has monthly interest_cash + interest_pik (asset income proxy)
+      - facility has drawn, commitment, cost_of_funds (funding/base proxy)
+      - uses last available facility row with date <= asof
+      - annualizes using trailing 30-day cashflow at asof (simple, consistent with our monthly synthetic data)
+    """
+    f = facility.sort_values("date")
+    f_asof = f[f["date"] <= asof].iloc[-1] if (f["date"] <= asof).any() else f.iloc[-1]
+
+    drawn = float(f_asof["drawn"])
+    commitment = float(f_asof["commitment"])
+    undrawn = max(0.0, commitment - drawn)
+
+    # funding/base rate proxy (annual)
+    base = float(f_asof.get("cost_of_funds", np.nan))  # we treat as base/funding proxy
+
+    # trailing month asset income (cash + PIK) at asof date
+    cf_m = cashflows[cashflows["pay_date"] == asof].copy()
+    asset_income_month = float(cf_m.get("interest_cash", 0).sum() + cf_m.get("interest_pik", 0).sum())
+    asset_income_annual = asset_income_month * 12.0  # simple annualization for monthly data
+
+    # (A) Lender facility yield (annual)
+    margin = facility_margin_bps / 10_000.0
+    undrawn_fee = undrawn_fee_bps / 10_000.0
+    facility_rate_drawn = (base if base == base else 0.0) + margin
+
+    lender_income_annual = drawn * facility_rate_drawn + undrawn * undrawn_fee
+    lender_yield_on_drawn = lender_income_annual / drawn if drawn > 0 else np.nan
+    lender_yield_on_commitment = lender_income_annual / commitment if commitment > 0 else np.nan
+
+    # (B) Borrower net carry (annual)
+    funding_cost_annual = drawn * (base if base == base else 0.0)
+    net_carry_annual = asset_income_annual - funding_cost_annual
+    net_carry_yield_on_drawn = net_carry_annual / drawn if drawn > 0 else np.nan
+
+    return {
+        "drawn": drawn,
+        "commitment": commitment,
+        "undrawn": undrawn,
+        "base_or_funding_rate": base,
+        "asset_income_annual": asset_income_annual,
+
+        "lender_income_annual": lender_income_annual,
+        "lender_yield_on_drawn": lender_yield_on_drawn,
+        "lender_yield_on_commitment": lender_yield_on_commitment,
+
+        "funding_cost_annual": funding_cost_annual,
+        "net_carry_annual": net_carry_annual,
+        "net_carry_yield_on_drawn": net_carry_yield_on_drawn,
+    }
+def borrowing_base_snapshot(positions: pd.DataFrame, asof: pd.Timestamp) -> dict:
+    p = positions[positions["asof_date"] == asof].copy()
+    if p.empty:
+        return {"borrowing_base": float("nan"), "eligible_collateral": float("nan")}
+
+    # Respect eligibility if present
+    if "eligible_flag" in p.columns:
+        p = p[p["eligible_flag"] == 1]
+
+    # Prefer stored (audited) fields
+    if {"eligible_collateral","borrowing_base_contrib"}.issubset(p.columns):
+        return {
+            "eligible_collateral": float(p["eligible_collateral"].sum()),
+            "borrowing_base": float(p["borrowing_base_contrib"].sum()),  # gross BB
+        }
+
+    # Fallback compute
+    req = {"collateral_mv","haircut_pct","advance_rate_pct"}
+    if not req.issubset(p.columns):
+        return {"borrowing_base": float("nan"), "eligible_collateral": float("nan")}
+
+    p["eligible_collateral"] = p["collateral_mv"] * (1 - p["haircut_pct"])
+    p["bb_contrib"] = p["eligible_collateral"] * p["advance_rate_pct"]
+
+    return {
+        "eligible_collateral": float(p["eligible_collateral"].sum()),
+        "borrowing_base": float(p["bb_contrib"].sum()),
+    }
 
 def wa(df: pd.DataFrame, value_col: str, weight_col: str) -> float:
     w = df[weight_col].astype(float)

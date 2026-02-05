@@ -4,8 +4,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from lib.metrics import principal_bridge_for_loan
+from lib.state import get_data
 
-DATA = st.session_state["DATA"]
+DATA = get_data()
+#DATA = st.session_state["DATA"]
 positions = DATA["positions"]
 cashflows = DATA["cashflows"]
 risk = DATA["risk"]

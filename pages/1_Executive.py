@@ -1,8 +1,10 @@
 import streamlit as st
 import plotly.express as px
 from lib.metrics import portfolio_snapshot
+from lib.state import get_data
 
-DATA = st.session_state["DATA"]
+DATA = get_data()
+#DATA = st.session_state["DATA"]
 positions = DATA["positions"]
 risk = DATA["risk"]
 asof = DATA["asof"]
