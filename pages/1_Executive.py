@@ -10,6 +10,8 @@ asof = DATA["asof"]
 st.header("Executive Summary")
 
 snap = portfolio_snapshot(positions, risk, asof)
+util = snap["utilisation"]
+st.metric("Utilisation", f"{100*util:.1f}%" if util==util else "n/a")
 
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Loans", snap["num_loans"])

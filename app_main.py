@@ -9,7 +9,7 @@ uploaded_file = st.file_uploader("Upload your data file", type=["csv","xlsx","zi
 if uploaded_file is None:
     st.info("Please upload a data file to proceed, or will consume default data in local")
 
-df = load_table(uploaded_file)
+#df = load_table(uploaded_file)
 #st.dataframe(df)
 positions, cashflows, nav, risk, facility = load_all()
 
