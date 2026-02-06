@@ -2,10 +2,14 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+
 from lib.metrics import borrowing_base_snapshot, facility_yield_snapshot
 from lib.state import get_data
 
-DATA = get_data()
+# -----------------------------
+# Data
+# -----------------------------
+DATA = get_data() #st.session_state["DATA"]
 positions = DATA["positions"]
 cashflows = DATA["cashflows"]
 facility = DATA["facility"]
@@ -14,7 +18,7 @@ asof = DATA["asof"]
 st.header("Liquidity, Funding & Borrowing Base")
 
 # -----------------------------
-# Borrowing base snapshot
+# Borrowing base snapshot (asof)
 # -----------------------------
 bb = borrowing_base_snapshot(positions, asof)
 
@@ -25,13 +29,12 @@ drawn = float(f_asof["drawn"])
 commitment = float(f_asof["commitment"])
 undrawn = max(0.0, commitment - drawn)
 
-# Prefer facility’s stored BB net/headroom if present (audit-friendly)
+# Prefer stored net BB/headroom/margin_call if present (audit-friendly)
 if {"borrowing_base_net", "headroom", "margin_call"}.issubset(f_asof.index):
     borrowing_base_net = float(f_asof["borrowing_base_net"])
     headroom = float(f_asof["headroom"])
     margin_call = float(f_asof["margin_call"])
 else:
-    # Fallback if facility file doesn't contain net BB fields
     borrowing_base_net = float(bb["borrowing_base"])
     headroom = borrowing_base_net - drawn if borrowing_base_net == borrowing_base_net else np.nan
     margin_call = max(0.0, drawn - borrowing_base_net) if borrowing_base_net == borrowing_base_net else np.nan
@@ -126,11 +129,30 @@ st.caption(
 )
 
 # -----------------------------
-# Collateral composition (optional but useful)
+# Equity & ROE (explicit)
+# -----------------------------
+st.subheader("Equity & ROE")
+
+p_asof = positions[positions["asof_date"] == asof].copy()
+asset_par = float(p_asof["par"].sum()) if "par" in p_asof.columns else np.nan
+
+equity = asset_par - drawn if asset_par == asset_par else np.nan
+equity = equity if (equity == equity and equity > 0) else np.nan
+
+roe = (y["net_carry_annual"] / equity) if (equity == equity) else np.nan
+
+e1, e2, e3 = st.columns(3)
+e1.metric("Asset Par", f"{asset_par:,.0f}" if asset_par == asset_par else "n/a")
+e2.metric("Equity (Asset − Drawn)", f"{equity:,.0f}" if equity == equity else "n/a")
+e3.metric("ROE (Net Carry / Equity)", f"{100*roe:.2f}%" if roe == roe else "n/a")
+
+st.caption("Equity is the residual capital beneath the facility. ROE is net carry divided by equity (levered return proxy).")
+
+# -----------------------------
+# Collateral composition (asof)
 # -----------------------------
 st.subheader("Collateral & Eligibility (As-of)")
 
-p_asof = positions[positions["asof_date"] == asof].copy()
 cols = [c for c in [
     "loan_id","par","status","dpd",
     "collateral_mv","haircut_pct","advance_rate_pct","eligible_flag",
